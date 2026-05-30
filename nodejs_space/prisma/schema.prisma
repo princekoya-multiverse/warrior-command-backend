@@ -1,0 +1,280 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/warrior_command_backend/nodejs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model user {
+  id             String    @id @default(uuid()) @db.Uuid
+  wallet_address String?   @unique @db.VarChar(44)
+  username       String    @unique @db.VarChar(50)
+  display_name   String?   @db.VarChar(100)
+  email          String?   @db.VarChar(255)
+  role           String    @default("operator") @db.VarChar(20)
+  preferences    Json      @default("{}")
+  api_key_hash   String?   @db.VarChar(255)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  last_active    DateTime?
+
+  projects   project[]
+  tasks      task[]       @relation("assigned_tasks")
+  daily_logs daily_log[]
+  sessions   session[]
+  memories   agent_memory[]
+
+  @@index([wallet_address])
+  @@index([username])
+}
+
+model project {
+  id          String    @id @default(uuid()) @db.Uuid
+  owner_id    String    @db.Uuid
+  name        String    @db.VarChar(200)
+  description String?
+  status      String    @default("active") @db.VarChar(20)
+  priority    Int       @default(0)
+  tags        String[]
+  metadata    Json      @default("{}")
+  started_at  DateTime?
+  target_completion DateTime?
+  completed_at DateTime?
+  archived_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  owner      user       @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  epics      epic[]
+  tasks      task[]
+  daily_logs daily_log[]
+  sessions   session[]
+  memories   agent_memory[]
+
+  @@index([owner_id])
+  @@index([status])
+}
+
+model epic {
+  id              String    @id @default(uuid()) @db.Uuid
+  project_id      String    @db.Uuid
+  parent_epic_id  String?   @db.Uuid
+  name            String    @db.VarChar(200)
+  description     String?
+  status          String    @default("planned") @db.VarChar(20)
+  priority        Int       @default(0)
+  completion_percentage Int  @default(0)
+  tags            String[]
+  metadata        Json      @default("{}")
+  started_at      DateTime?
+  target_completion DateTime?
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  project     project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  parent_epic epic?    @relation("epic_hierarchy", fields: [parent_epic_id], references: [id], onDelete: SetNull)
+  child_epics epic[]   @relation("epic_hierarchy")
+  tasks       task[]
+
+  @@index([project_id])
+  @@index([parent_epic_id])
+  @@index([status])
+}
+
+model task {
+  id              String    @id @default(uuid()) @db.Uuid
+  project_id      String    @db.Uuid
+  epic_id         String?   @db.Uuid
+  parent_task_id  String?   @db.Uuid
+  title           String    @db.VarChar(300)
+  description     String?
+  status          String    @default("todo") @db.VarChar(20)
+  priority        Int       @default(0)
+  assigned_to     String?   @db.Uuid
+  assigned_agent  String?   @db.VarChar(100)
+  estimated_hours Float?
+  actual_hours    Float?
+  tags            String[]
+  dependencies    String[]  @db.Uuid
+  metadata        Json      @default("{}")
+  due_date        DateTime?
+  started_at      DateTime?
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  project     project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  epic        epic?    @relation(fields: [epic_id], references: [id], onDelete: SetNull)
+  parent_task task?    @relation("task_hierarchy", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks    task[]   @relation("task_hierarchy")
+  assignee    user?    @relation("assigned_tasks", fields: [assigned_to], references: [id], onDelete: SetNull)
+  memories    agent_memory[]
+
+  @@index([project_id])
+  @@index([epic_id])
+  @@index([parent_task_id])
+  @@index([status])
+  @@index([assigned_to])
+  @@index([due_date])
+}
+
+model daily_log {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String   @db.Uuid
+  project_id       String?  @db.Uuid
+  log_date         DateTime @db.Date
+  summary          String
+  accomplishments  String[]
+  blockers         String[]
+  next_actions     String[]
+  tasks_completed  String[] @db.Uuid
+  tasks_started    String[] @db.Uuid
+  mood             String?  @db.VarChar(20)
+  energy_level     Int?
+  metadata         Json     @default("{}")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user    user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project project? @relation(fields: [project_id], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, log_date])
+  @@index([user_id, log_date(sort: Desc)])
+  @@index([project_id])
+}
+
+model agent {
+  id          String   @id @default(uuid()) @db.Uuid
+  identifier  String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(200)
+  description String?
+  type        String   @default("assistant") @db.VarChar(50)
+  capabilities String[]
+  config      Json     @default("{}")
+  status      String   @default("active") @db.VarChar(20)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([status])
+}
+
+model session {
+  id                String    @id @default(uuid()) @db.Uuid
+  user_id           String    @db.Uuid
+  session_type      String    @default("general") @db.VarChar(50)
+  livekit_room_name String?   @db.VarChar(100)
+  project_id        String?   @db.Uuid
+  task_ids          String[]  @db.Uuid
+  status            String    @default("active") @db.VarChar(20)
+  started_at        DateTime  @default(now())
+  ended_at          DateTime?
+  duration_seconds  Int?
+  parent_session_id String?   @db.Uuid
+  handoff_summary   String?
+  handoff_context   Json?
+  agent_identifiers String[]
+  total_messages    Int       @default(0)
+  total_tokens_used Int       @default(0)
+  metadata          Json      @default("{}")
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  user           user      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project        project?  @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  parent_session session?  @relation("session_chain", fields: [parent_session_id], references: [id], onDelete: SetNull)
+  child_sessions session[] @relation("session_chain")
+  messages       message[]
+  memories       agent_memory[]
+
+  source_handoffs session_handoff[] @relation("source_handoff")
+  target_handoffs session_handoff[] @relation("target_handoff")
+
+  @@index([user_id])
+  @@index([project_id])
+  @@index([status])
+  @@index([started_at(sort: Desc)])
+  @@index([parent_session_id])
+}
+
+model message {
+  id               String   @id @default(uuid()) @db.Uuid
+  session_id       String   @db.Uuid
+  role             String   @db.VarChar(20)
+  content          String
+  agent_identifier String?  @db.VarChar(100)
+  tool_calls       Json?
+  tool_results     Json?
+  token_count      Int?
+  latency_ms       Int?
+  metadata         Json     @default("{}")
+  created_at       DateTime @default(now())
+
+  session session @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@index([created_at])
+  @@index([role])
+}
+
+model agent_memory {
+  id              String    @id @default(uuid()) @db.Uuid
+  user_id         String    @db.Uuid
+  session_id      String?   @db.Uuid
+  memory_type     String    @db.VarChar(50)
+  scope           String    @default("user") @db.VarChar(50)
+  content         String
+  summary         String?
+  vector_id       String?   @db.VarChar(100)
+  embedding_model String    @default("abacus-ai-embed-v1") @db.VarChar(100)
+  project_id      String?   @db.Uuid
+  task_id         String?   @db.Uuid
+  importance_score Float    @default(0.5)
+  access_count    Int       @default(0)
+  last_accessed   DateTime?
+  expires_at      DateTime?
+  archived        Boolean   @default(false)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  user    user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  session session? @relation(fields: [session_id], references: [id], onDelete: SetNull)
+  project project? @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  task    task?    @relation(fields: [task_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([session_id])
+  @@index([memory_type])
+  @@index([project_id])
+  @@index([importance_score(sort: Desc)])
+}
+
+model session_handoff {
+  id                String    @id @default(uuid()) @db.Uuid
+  source_session_id String    @db.Uuid
+  target_session_id String?   @db.Uuid
+  handoff_type      String    @default("continuation") @db.VarChar(50)
+  summary           String
+  key_decisions     Json?
+  pending_actions   Json?
+  context_snapshot  Json?
+  memory_references String[]  @db.Uuid
+  task_references   String[]  @db.Uuid
+  file_references   String[]
+  acknowledged      Boolean   @default(false)
+  acknowledged_at   DateTime?
+  acknowledged_by   String?   @db.Uuid
+  created_at        DateTime  @default(now())
+
+  source_session session  @relation("source_handoff", fields: [source_session_id], references: [id], onDelete: Cascade)
+  target_session session? @relation("target_handoff", fields: [target_session_id], references: [id], onDelete: SetNull)
+
+  @@index([source_session_id])
+  @@index([target_session_id])
+  @@index([created_at(sort: Desc)])
+}
