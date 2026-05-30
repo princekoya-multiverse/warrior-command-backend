@@ -34,7 +34,6 @@ RUN npm install --legacy-peer-deps --omit=dev
 
 # Copy built output, prisma, and entrypoint
 COPY --from=builder /app/dist ./dist
-RUN echo "=== Production stage: verifying dist ===" && ls -la /app/dist/ && test -f /app/dist/main.js && echo "=== dist/main.js confirmed ==="
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
