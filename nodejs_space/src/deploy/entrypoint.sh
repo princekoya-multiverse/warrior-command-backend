@@ -21,5 +21,9 @@ echo "[Warrior Command Center] Running database migrations..."
 npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss 2>/dev/null || echo "[Warrior Command Center] Migration skipped (may already be applied)"
 
 # Start the application
-echo "[Warrior Command Center] Starting server on port ${PORT:-3000}..."
+echo "[Warrior Command Center] Starting server on port ${PORT:-3000} - FORCE_REDEPLOY=${FORCE_REDEPLOY:-none}..."
+echo "[Warrior Command Center] Working directory: $(pwd)"
+echo "[Warrior Command Center] Contents of /app/dist/:"
+ls -la /app/dist/ 2>&1 || echo "[Warrior Command Center] /app/dist/ does not exist!"
+echo "[Warrior Command Center] Launching node dist/main.js..."
 exec node dist/main.js
