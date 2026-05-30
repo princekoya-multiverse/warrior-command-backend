@@ -1,0 +1,146 @@
+# ============================================================
+# WARRIOR COMMAND CENTER - Akash Network SDL
+# ============================================================
+# Deployment: Multi-service stack on Akash Network
+# Services: Backend API + PostgreSQL + Qdrant Vector Store
+# Budget: Optimized for ~$30-50/month on Akash
+# ============================================================
+---
+version: "2.0"
+
+services:
+  # ─────────────────────────────────────────
+  # PostgreSQL Database
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    env:
+      - POSTGRES_DB=warrior_command
+      - POSTGRES_USER=warrior
+      - POSTGRES_PASSWORD=CHANGE_THIS_PASSWORD_NOW
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    expose:
+      - port: 5432
+        as: 5432
+        to:
+          - service: backend
+    params:
+      storage:
+        data:
+          mount: /var/lib/postgresql/data
+          readOnly: false
+
+  # ─────────────────────────────────────────
+  # Qdrant Vector Store (Semantic Memory)
+  # ─────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    env:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__STORAGE__OPTIMIZERS__DEFAULT_SEGMENT_NUMBER=2
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=1
+    expose:
+      - port: 6333
+        as: 6333
+        to:
+          - service: backend
+      - port: 6334
+        as: 6334
+        to:
+          - service: backend
+    params:
+      storage:
+        qdrant-data:
+          mount: /qdrant/storage
+          readOnly: false
+
+  # ─────────────────────────────────────────
+  # Warrior Command Center Backend API
+  # ─────────────────────────────────────────
+  backend:
+    image: YOUR_DOCKERHUB_USERNAME/warrior-command-backend:latest
+    depends-on:
+      - postgres
+      - qdrant
+    env:
+      - DATABASE_URL=postgresql://warrior:CHANGE_THIS_PASSWORD_NOW@postgres:5432/warrior_command
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+      - ABACUSAI_API_KEY=YOUR_ABACUS_API_KEY
+      - LIVEKIT_URL=
+      - LIVEKIT_API_KEY=
+      - LIVEKIT_API_SECRET=
+      - JWT_SECRET=GENERATE_A_STRONG_SECRET_HERE
+      - PORT=3000
+      - NODE_ENV=production
+    expose:
+      - port: 3000
+        as: 80
+        to:
+          - global: true
+        accept:
+          - "warrior-command.akash.pub"
+
+profiles:
+  compute:
+    postgres:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          - size: 512Mi
+          - name: data
+            size: 5Gi
+            attributes:
+              persistent: true
+              class: beta3
+    qdrant:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          - size: 256Mi
+          - name: qdrant-data
+            size: 2Gi
+            attributes:
+              persistent: true
+              class: beta3
+    backend:
+      resources:
+        cpu:
+          units: 1
+        memory:
+          size: 1Gi
+        storage:
+          - size: 1Gi
+  placement:
+    dcloud:
+      pricing:
+        postgres:
+          denom: uakt
+          amount: 1000
+        qdrant:
+          denom: uakt
+          amount: 1000
+        backend:
+          denom: uakt
+          amount: 1000
+
+deployment:
+  postgres:
+    dcloud:
+      profile: postgres
+      count: 1
+  qdrant:
+    dcloud:
+      profile: qdrant
+      count: 1
+  backend:
+    dcloud:
+      profile: backend
+      count: 1

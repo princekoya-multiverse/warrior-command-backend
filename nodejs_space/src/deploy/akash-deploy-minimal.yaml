@@ -1,0 +1,49 @@
+# ============================================================
+# WARRIOR COMMAND CENTER - MINIMAL Akash SDL
+# ============================================================
+# Budget-optimized: Backend only with external/managed DB
+# Cost: ~$15-25/month on Akash
+# Use this if you want to start with the cheapest option
+# and use a managed PostgreSQL (like Neon free tier)
+# ============================================================
+---
+version: "2.0"
+
+services:
+  backend:
+    image: YOUR_DOCKERHUB_USERNAME/warrior-command-backend:latest
+    env:
+      - DATABASE_URL=YOUR_EXTERNAL_DATABASE_URL
+      - QDRANT_URL=
+      - ABACUSAI_API_KEY=YOUR_ABACUS_API_KEY
+      - JWT_SECRET=GENERATE_A_STRONG_SECRET_HERE
+      - PORT=3000
+      - NODE_ENV=production
+    expose:
+      - port: 3000
+        as: 80
+        to:
+          - global: true
+
+profiles:
+  compute:
+    backend:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          - size: 512Mi
+  placement:
+    dcloud:
+      pricing:
+        backend:
+          denom: uakt
+          amount: 1000
+
+deployment:
+  backend:
+    dcloud:
+      profile: backend
+      count: 1

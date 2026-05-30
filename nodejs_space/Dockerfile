@@ -37,4 +37,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# Entrypoint script: run migrations then start
+COPY src/deploy/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+CMD ["./entrypoint.sh"]
