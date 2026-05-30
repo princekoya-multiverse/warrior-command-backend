@@ -5,9 +5,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Enable corepack for Yarn Berry
+RUN corepack enable
+
+# Copy Yarn config and lockfile first for layer caching
+COPY package.json yarn.lock ./
+
+# Create a Docker-friendly .yarnrc.yml (override the platform-specific one)
+RUN echo 'nodeLinker: node-modules' > .yarnrc.yml
+
 # Install dependencies
-COPY package.json ./
-RUN corepack enable && yarn install
+RUN yarn install --immutable || yarn install
 
 # Generate Prisma client
 COPY prisma ./prisma
