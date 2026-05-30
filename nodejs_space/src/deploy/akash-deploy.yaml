@@ -59,7 +59,7 @@ services:
   # Warrior Command Center Backend API
   # ─────────────────────────────────────────
   backend:
-    image: YOUR_DOCKERHUB_USERNAME/warrior-command-backend:latest
+    image: ghcr.io/princekoya-multiverse/warrior-command-backend:latest
     depends-on:
       - postgres
       - qdrant
